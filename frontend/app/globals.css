@@ -1,0 +1,77 @@
+/* 1. IMPORTS */
+/* BUG FIX #8: Google Fonts @import must come BEFORE @import "tailwindcss".
+   When it was after, Tailwind's preflight reset overrode the font-face
+   declarations, so Space Grotesk and IBM Plex Mono never loaded. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* 2. REAL RAILS DNA VARIABLES */
+:root {
+  /* Core Colors */
+  --background: #030712; /* MANDATORY */
+  --foreground: #E2E8F0;
+  --surface: #0B1117;
+  --border: #1F2937;
+  --primary: #38BDF8;
+  --secondary: #818CF8;
+
+  /* Typography */
+  --font-space: "Space Grotesk", sans-serif;
+  --font-ibm: "IBM Plex Mono", monospace;
+}
+
+/* 3. GLOBAL BASE STYLES */
+@layer base {
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-space);
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: normal;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* BUG FIX #9: Recharts tooltip was clipping at chart edges because the
+     parent <main> had overflow: hidden. Recharts renders tooltips inside
+     the chart SVG container. We need the overflow hidden on the outer
+     wrapper only, not on the inner scrollable tab content area.
+     The fix is to let .recharts-wrapper overflow visibly. */
+  .recharts-wrapper {
+    overflow: visible !important;
+  }
+}
+
+/* 4. LAYOUT UTILITIES (MANDATORY 70/30) */
+.main-stage-70 {
+  width: 70%;
+  background-color: var(--background);
+}
+
+.sidebar-30 {
+  width: 30%;
+  background-color: var(--surface);
+  border-left: 1px solid var(--border);
+}
+
+/* 5. GLASSMORPHISM (SUBTLE — PROTOCOL STYLE) */
+.glass-card {
+  background: rgba(11, 17, 23, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-card:hover {
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+  transform: translateY(-2px);
+}

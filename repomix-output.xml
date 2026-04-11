@@ -1,0 +1,1279 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+backend/main.py
+frontend/.gitignore
+frontend/app/favicon.ico
+frontend/app/globals.css
+frontend/app/layout.tsx
+frontend/app/page.tsx
+frontend/eslint.config.mjs
+frontend/next.config.ts
+frontend/package.json
+frontend/postcss.config.mjs
+frontend/public/file.svg
+frontend/public/globe.svg
+frontend/public/next.svg
+frontend/public/vercel.svg
+frontend/public/window.svg
+frontend/README.md
+frontend/tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="backend/main.py">
+"""
+Real Rails — Fraud Velocity Monitor (PoC #07)
+Backend: FastAPI + Pandas
+Archetype: TEMPORAL (Signal Stream)
+Version: v2-temporal
+"""
+
+from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+import pandas as pd
+import numpy as np
+import io
+from datetime import datetime, timedelta
+from typing import Optional
+
+app = FastAPI(title="Fraud Velocity Monitor API — Temporal", version="2.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+MERCHANT_CATEGORIES = ["E-Commerce", "Crypto Exchange", "Wire Transfer", "ATM", "POS Retail", "Subscription"]
+DEVICE_TYPES = ["mobile", "desktop", "tablet", "unknown"]
+REGIONS = ["Northeast", "Southeast", "Midwest", "Southwest", "West", "Northwest"]
+
+
+def generate_signal_stream(n_minutes: int = 1440, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    now = datetime.utcnow().replace(second=0, microsecond=0)
+    rows = []
+    for i in range(n_minutes):
+        ts = now - timedelta(minutes=n_minutes - i)
+        hour = ts.hour
+        base_txn = 8 if 9 <= hour <= 18 else 3
+        txn_count = int(rng.poisson(base_txn))
+        is_burst = rng.random() < 0.03
+        is_risk_surge = rng.random() < 0.025
+        is_amount_spike = rng.random() < 0.02
+        fraud_count = int(rng.poisson(0.3 + (4 if is_burst else 0)))
+        suspicious_count = int(rng.poisson(0.5 + (2 if is_risk_surge else 0)))
+        avg_risk = float(rng.uniform(0.55, 0.9) if is_burst or is_risk_surge else rng.uniform(0.1, 0.35))
+        max_velocity = int(rng.integers(20, 38) if is_burst else rng.integers(8, 15) if is_risk_surge else rng.integers(1, 8))
+        total_amount = float(rng.uniform(50000, 250000) if is_amount_spike else rng.uniform(5000, 40000))
+        anomaly = bool(is_burst or is_risk_surge or is_amount_spike)
+        spike_type = ("burst" if is_burst else "risk_surge" if is_risk_surge else "amount_spike" if is_amount_spike else None)
+        rows.append({
+            "timestamp": ts.isoformat() + "Z",
+            "minute_index": i,
+            "txn_count": txn_count,
+            "fraud_count": fraud_count,
+            "suspicious_count": suspicious_count,
+            "normal_count": max(0, txn_count - fraud_count - suspicious_count),
+            "avg_risk": round(avg_risk, 4),
+            "max_velocity": max_velocity,
+            "total_amount": round(total_amount, 2),
+            "anomaly": anomaly,
+            "spike_type": spike_type,
+        })
+    return pd.DataFrame(rows)
+
+
+def generate_events(n: int = 500, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    now = datetime.utcnow()
+    LABELS = ["normal", "normal", "normal", "suspicious", "fraudulent"]
+    records = []
+    for i in range(n):
+        label = str(rng.choice(LABELS))
+        amount = float(rng.uniform(5000, 50000) if label == "fraudulent" else rng.uniform(500, 15000) if label == "suspicious" else rng.uniform(10, 5000))
+        velocity = int(rng.integers(15, 40) if label == "fraudulent" else rng.integers(8, 18) if label == "suspicious" else rng.integers(1, 8))
+        risk = float(rng.uniform(0.7, 1.0) if label == "fraudulent" else rng.uniform(0.4, 0.75) if label == "suspicious" else rng.uniform(0.0, 0.4))
+        ts = now - timedelta(minutes=int(rng.integers(0, 1440)))
+        records.append({
+            "event_id": f"EVT-{10000 + i}",
+            "timestamp": ts.isoformat() + "Z",
+            "amount": round(amount, 2),
+            "merchant_category": str(rng.choice(MERCHANT_CATEGORIES)),
+            "label": label,
+            "risk_score": round(risk, 3),
+            "velocity_1h": velocity,
+            "device_type": str(rng.choice(DEVICE_TYPES)),
+            "device_fingerprint": f"FP-{int(rng.integers(10000, 99999))}",
+            "ip_hash": f"ip-{int(rng.integers(100000, 999999))}",
+            "region": str(rng.choice(REGIONS)),
+            "flagged_for_review": bool(label in ["fraudulent", "suspicious"] and float(rng.random()) > 0.3),
+        })
+    return pd.DataFrame(records)
+
+
+SIGNAL_STREAM = generate_signal_stream(1440)
+EVENTS_DF = generate_events(500)
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "version": "v2-temporal", "archetype": "Temporal/SignalStream", "signal_minutes": len(SIGNAL_STREAM)}
+
+
+@app.get("/api/signal-stream")
+def get_signal_stream(
+    resolution: str = Query("5min"),
+    hours_back: int = Query(24, le=24),
+):
+    df = SIGNAL_STREAM.copy().tail(hours_back * 60)
+    if resolution == "5min":
+        df["bucket"] = (df["minute_index"] // 5) * 5
+    elif resolution == "15min":
+        df["bucket"] = (df["minute_index"] // 15) * 15
+    elif resolution == "1h":
+        df["bucket"] = df["minute_index"] // 60
+    else:
+        return {"resolution": "1min", "stream": df.to_dict(orient="records"), "data_points": len(df)}
+
+    df = df.groupby("bucket").agg(
+        timestamp=("timestamp", "first"),
+        txn_count=("txn_count", "sum"),
+        fraud_count=("fraud_count", "sum"),
+        suspicious_count=("suspicious_count", "sum"),
+        normal_count=("normal_count", "sum"),
+        avg_risk=("avg_risk", "mean"),
+        max_velocity=("max_velocity", "max"),
+        total_amount=("total_amount", "sum"),
+        anomaly=("anomaly", "any"),
+        spike_type=("spike_type", lambda x: next((v for v in x if v), None)),
+    ).reset_index(drop=True)
+    df["avg_risk"] = df["avg_risk"].round(4)
+    df["total_amount"] = df["total_amount"].round(2)
+    return {"resolution": resolution, "data_points": len(df), "stream": df.to_dict(orient="records")}
+
+
+@app.get("/api/anomalies")
+def get_anomalies():
+    df = SIGNAL_STREAM[SIGNAL_STREAM["anomaly"] == True].copy()
+    return {"anomalies": df.to_dict(orient="records"), "total": len(df), "by_type": df["spike_type"].value_counts().to_dict()}
+
+
+@app.get("/api/metrics/summary")
+def get_summary():
+    df = SIGNAL_STREAM
+    evdf = EVENTS_DF
+    total = int(df["txn_count"].sum())
+    fraud = int(df["fraud_count"].sum())
+    exposure = float(evdf[evdf["label"].isin(["fraudulent", "suspicious"])]["amount"].sum())
+    fraud_rate = round(fraud / total * 100, 2) if total else 0
+    regional_avg = float(evdf["amount"].mean())
+    return {
+        "total_events": total,
+        "fraud_count": fraud,
+        "flagged_for_review": int(len(evdf[evdf["flagged_for_review"] == True])),
+        "fraud_rate_pct": fraud_rate,
+        "total_exposure_usd": round(exposure, 2),
+        "peak_velocity_1h": int(df["max_velocity"].max()),
+        "anomaly_minutes": int(df["anomaly"].sum()),
+        "avg_fraud_velocity_1h": round(float(evdf[evdf["label"] == "fraudulent"]["velocity_1h"].mean()), 1),
+        "pct_above_regional_avg": round(len(evdf[evdf["amount"] > regional_avg]) / len(evdf) * 100, 1),
+    }
+
+
+@app.get("/api/metrics/velocity-heatmap")
+def get_velocity_heatmap():
+    df = SIGNAL_STREAM.copy()
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["hour"] = df["timestamp"].dt.hour
+    result = df.groupby("hour").agg(avg_fraud=("fraud_count", "mean"), avg_velocity=("max_velocity", "mean"), anomaly_rate=("anomaly", "mean")).reset_index().round(3)
+    return {"heatmap": result.to_dict(orient="records")}
+
+
+@app.get("/api/metrics/category-breakdown")
+def get_category_breakdown():
+    df = EVENTS_DF.copy()
+    result = df.groupby("merchant_category").agg(total=("event_id", "count"), fraud=("label", lambda x: (x == "fraudulent").sum()), avg_risk=("risk_score", "mean"), total_amount=("amount", "sum")).reset_index()
+    result["fraud_rate"] = (result["fraud"] / result["total"] * 100).round(1)
+    result["avg_risk"] = result["avg_risk"].round(3)
+    return {"categories": result.to_dict(orient="records")}
+
+
+@app.get("/api/review-queue")
+def get_review_queue(limit: int = 20):
+    df = EVENTS_DF[EVENTS_DF["flagged_for_review"] == True].copy()
+    df = df.sort_values("risk_score", ascending=False).head(limit)
+    return {"queue": df.to_dict(orient="records"), "total_flagged": len(df)}
+
+
+@app.get("/api/events")
+def get_events(label: Optional[str] = None, region: Optional[str] = None, min_risk: float = 0.0, limit: int = Query(200, le=500)):
+    df = EVENTS_DF.copy()
+    if label and label != "all": df = df[df["label"] == label]
+    if region and region != "all": df = df[df["region"] == region]
+    df = df[df["risk_score"] >= min_risk]
+    return {"events": df.sort_values("timestamp", ascending=False).head(limit).to_dict(orient="records"), "total": len(df)}
+
+
+@app.get("/api/download/sample-data")
+def download_sample():
+    buf = io.StringIO()
+    SIGNAL_STREAM.head(100).to_csv(buf, index=False)
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=fraud_signal_stream_sample.csv"})
+</file>
+
+<file path="frontend/.gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="frontend/app/globals.css">
+/* 1. IMPORTS */
+/* BUG FIX #8: Google Fonts @import must come BEFORE @import "tailwindcss".
+   When it was after, Tailwind's preflight reset overrode the font-face
+   declarations, so Space Grotesk and IBM Plex Mono never loaded. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* 2. REAL RAILS DNA VARIABLES */
+:root {
+  /* Core Colors */
+  --background: #030712; /* MANDATORY */
+  --foreground: #E2E8F0;
+  --surface: #0B1117;
+  --border: #1F2937;
+  --primary: #38BDF8;
+  --secondary: #818CF8;
+
+  /* Typography */
+  --font-space: "Space Grotesk", sans-serif;
+  --font-ibm: "IBM Plex Mono", monospace;
+}
+
+/* 3. GLOBAL BASE STYLES */
+@layer base {
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-space);
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: normal;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* BUG FIX #9: Recharts tooltip was clipping at chart edges because the
+     parent <main> had overflow: hidden. Recharts renders tooltips inside
+     the chart SVG container. We need the overflow hidden on the outer
+     wrapper only, not on the inner scrollable tab content area.
+     The fix is to let .recharts-wrapper overflow visibly. */
+  .recharts-wrapper {
+    overflow: visible !important;
+  }
+}
+
+/* 4. LAYOUT UTILITIES (MANDATORY 70/30) */
+.main-stage-70 {
+  width: 70%;
+  background-color: var(--background);
+}
+
+.sidebar-30 {
+  width: 30%;
+  background-color: var(--surface);
+  border-left: 1px solid var(--border);
+}
+
+/* 5. GLASSMORPHISM (SUBTLE — PROTOCOL STYLE) */
+.glass-card {
+  background: rgba(11, 17, 23, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-card:hover {
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+  transform: translateY(-2px);
+}
+</file>
+
+<file path="frontend/app/layout.tsx">
+import type { Metadata } from "next";
+import "./globals.css";
+
+// BUG FIX #10: Title was "Create Next App" (default Next.js template value).
+// Updated to reflect the actual project name as required by VAR FIX #1.
+export const metadata: Metadata = {
+  title: "Fraud Velocity Monitor | Real Rails",
+  description:
+    "Real-time payment fraud and card testing pattern detection — PoC #07",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" className="h-full antialiased">
+      {/*
+        DNA GUARDRAIL:
+        1. bg-[#030712] = mandatory Obsidian Black background
+        2. text-[#E2E8F0] = slate-200 foreground
+        3. text-sm = anchors base font to 14px so text is readable
+        4. font-sans = Space Grotesk via globals.css --font-space
+
+        BUG FIX #11: overflow-x-hidden was blocking horizontal scroll on the
+        Review Queue table (which has 9 columns). Changed to overflow-x-auto
+        so wide tables scroll rather than clip silently.
+      */}
+      <body className="min-h-full bg-[#030712] text-[#E2E8F0] text-sm font-sans overflow-x-auto">
+        {children}
+      </body>
+    </html>
+  );
+}
+</file>
+
+<file path="frontend/app/page.tsx">
+"use client";
+import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  ComposedChart, Area, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+  Scatter, Cell, BarChart,
+} from "recharts";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+interface SignalPoint {
+  timestamp: string;
+  txn_count: number;
+  fraud_count: number;
+  suspicious_count: number;
+  normal_count: number;
+  avg_risk: number;
+  max_velocity: number;
+  total_amount: number;
+  anomaly: boolean;
+  spike_type: "burst" | "risk_surge" | "amount_spike" | null;
+  device_fingerprint?: string;
+  ip_hash?: string;
+}
+interface AnomalyEvent {
+  timestamp: string; spike_type: string; fraud_count: number;
+  avg_risk: number; max_velocity: number; total_amount: number;
+}
+interface Metrics {
+  total_events: number; fraud_count: number; flagged_for_review: number;
+  fraud_rate_pct: number; total_exposure_usd: number; peak_velocity_1h: number;
+  anomaly_minutes: number; avg_fraud_velocity_1h: number; pct_above_regional_avg: number;
+}
+interface CategoryRow {
+  merchant_category: string; total: number; fraud: number;
+  fraud_rate: number; avg_risk: number;
+}
+interface QueueEvent {
+  event_id: string; label: string; risk_score: number; amount: number;
+  velocity_1h: number; device_type: string; merchant_category: string;
+  device_fingerprint: string; ip_hash: string;
+}
+interface HeatmapRow {
+  hour: number; avg_fraud: number; avg_velocity: number; anomaly_rate: number;
+}
+
+// ─── FIX 1: rng() — use Math.imul + >>> 0 to avoid negative numbers ──────────
+function rng(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+const MERCHANT_CATEGORIES = ["E-Commerce","Crypto Exchange","Wire Transfer","ATM","POS Retail","Subscription"];
+const DEVICE_TYPES = ["mobile","desktop","tablet","unknown"];
+
+function genSignalStream(nMin = 288): SignalPoint[] {
+  const r = rng(42);
+  const now = Date.now();
+  return Array.from({ length: nMin }, (_, i) => {
+    const hour = new Date(now - (nMin - i) * 5 * 60000).getHours();
+    const isBurst = r() < 0.03;
+    const isRisk = r() < 0.025;
+    const isAmt = r() < 0.02;
+    const fraud = Math.round(r() * 2 + (isBurst ? 4 : 0));
+    return {
+      timestamp: new Date(now - (nMin - i) * 5 * 60000).toISOString(),
+      txn_count: Math.round(r() * 8 + (9 <= hour && hour <= 18 ? 8 : 3)),
+      fraud_count: fraud,
+      suspicious_count: Math.round(r() * 1.5 + (isRisk ? 2 : 0)),
+      normal_count: Math.max(0, Math.round(r() * 6)),
+      avg_risk: parseFloat((isBurst || isRisk ? 0.55 + r() * 0.35 : r() * 0.35).toFixed(4)),
+      max_velocity: isBurst ? 20 + Math.round(r() * 18) : isRisk ? 8 + Math.round(r() * 7) : 1 + Math.round(r() * 7),
+      total_amount: parseFloat((isAmt ? 50000 + r() * 200000 : 5000 + r() * 35000).toFixed(2)),
+      anomaly: isBurst || isRisk || isAmt,
+      spike_type: isBurst ? "burst" : isRisk ? "risk_surge" : isAmt ? "amount_spike" : null,
+      device_fingerprint: `FP-${10000 + Math.floor(r() * 89999)}`,
+      ip_hash: `ip-${100000 + Math.floor(r() * 899999)}`,
+    };
+  });
+}
+
+// ─── FIX 2: generate real fallback data for category, queue, heatmap ──────────
+function genEvents() {
+  const r = rng(99);
+  const LABELS = ["normal","normal","normal","suspicious","fraudulent"];
+  return Array.from({ length: 500 }, (_, i) => {
+    const label = LABELS[Math.floor(r() * LABELS.length)];
+    const amount = label === "fraudulent" ? 5000 + r() * 45000 : label === "suspicious" ? 500 + r() * 14500 : 10 + r() * 4990;
+    const velocity = label === "fraudulent" ? 15 + Math.round(r() * 25) : label === "suspicious" ? 8 + Math.round(r() * 10) : 1 + Math.round(r() * 7);
+    const risk = label === "fraudulent" ? 0.7 + r() * 0.3 : label === "suspicious" ? 0.4 + r() * 0.35 : r() * 0.4;
+    return {
+      event_id: `EVT-${10000 + i}`, label,
+      amount: parseFloat(amount.toFixed(2)), velocity_1h: velocity,
+      risk_score: parseFloat(risk.toFixed(3)),
+      merchant_category: MERCHANT_CATEGORIES[Math.floor(r() * MERCHANT_CATEGORIES.length)],
+      device_type: DEVICE_TYPES[Math.floor(r() * DEVICE_TYPES.length)],
+      device_fingerprint: `FP-${10000 + Math.floor(r() * 89999)}`,
+      ip_hash: `ip-${100000 + Math.floor(r() * 899999)}`,
+    };
+  });
+}
+
+function genCategoryBreakdown(): CategoryRow[] {
+  const events = genEvents();
+  const map: Record<string, { total: number; fraud: number; risk_sum: number }> = {};
+  events.forEach((e) => {
+    if (!map[e.merchant_category]) map[e.merchant_category] = { total: 0, fraud: 0, risk_sum: 0 };
+    map[e.merchant_category].total++;
+    if (e.label === "fraudulent") map[e.merchant_category].fraud++;
+    map[e.merchant_category].risk_sum += e.risk_score;
+  });
+  return Object.entries(map).map(([cat, d]) => ({
+    merchant_category: cat, total: d.total, fraud: d.fraud,
+    fraud_rate: parseFloat(((d.fraud / d.total) * 100).toFixed(1)),
+    avg_risk: parseFloat((d.risk_sum / d.total).toFixed(3)),
+  }));
+}
+
+function genReviewQueue(): QueueEvent[] {
+  return genEvents()
+    .filter((e) => e.label === "fraudulent" || e.label === "suspicious")
+    .sort((a, b) => b.risk_score - a.risk_score)
+    .slice(0, 20) as QueueEvent[];
+}
+
+function genHeatmap(stream: SignalPoint[]): HeatmapRow[] {
+  const hours: Record<number, { fraud: number[]; vel: number[]; anom: number[] }> = {};
+  stream.forEach((p) => {
+    const h = new Date(p.timestamp).getHours();
+    if (!hours[h]) hours[h] = { fraud: [], vel: [], anom: [] };
+    hours[h].fraud.push(p.fraud_count);
+    hours[h].vel.push(p.max_velocity);
+    hours[h].anom.push(p.anomaly ? 1 : 0);
+  });
+  return Array.from({ length: 24 }, (_, h) => {
+    const d = hours[h] ?? { fraud: [0], vel: [0], anom: [0] };
+    const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    return { hour: h, avg_fraud: parseFloat(avg(d.fraud).toFixed(2)), avg_velocity: parseFloat(avg(d.vel).toFixed(2)), anomaly_rate: parseFloat(avg(d.anom).toFixed(3)) };
+  });
+}
+
+async function fetchFallback<T>(url: string, fallback: T): Promise<T> {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error();
+    return res.json();
+  } catch { return fallback; }
+}
+
+// ─── TOOLTIP ─────────────────────────────────────────────────────────────────
+const SignalTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string; }) => {
+  if (!active || !payload?.length) return null;
+  const pt = payload[0]?.payload as SignalPoint;
+  return (
+    <div style={{ background: "#0F1822", border: "1px solid #1F2937", borderRadius: 6, padding: "10px 12px", fontSize: 11, minWidth: 180, pointerEvents: "none" }}>
+      <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#64748B", marginBottom: 6 }}>{label}</div>
+      {pt?.anomaly && (
+        <div style={{
+          marginBottom: 6, padding: "2px 8px", borderRadius: 3, fontSize: 9,
+          fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600,
+          background: pt.spike_type === "burst" ? "rgba(248,113,113,0.15)" : pt.spike_type === "risk_surge" ? "rgba(251,191,36,0.15)" : "rgba(129,140,248,0.15)",
+          color: pt.spike_type === "burst" ? "#F87171" : pt.spike_type === "risk_surge" ? "#FBBF24" : "#818CF8",
+          border: `1px solid ${pt.spike_type === "burst" ? "rgba(248,113,113,0.3)" : pt.spike_type === "risk_surge" ? "rgba(251,191,36,0.3)" : "rgba(129,140,248,0.3)"}`,
+        }}>
+          ⚡ {pt.spike_type?.replace("_", " ").toUpperCase()} ANOMALY
+        </div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {payload.map((p, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: p.color, opacity: 0.8 }}>{p.name}</span>
+            <span style={{ fontWeight: 600, color: "#E2E8F0" }}>
+              {typeof p.value === "number" ? p.value.toFixed(p.name === "Avg Risk" ? 3 : 0) : p.value}
+            </span>
+          </div>
+        ))}
+        {pt && (
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginTop: 4, paddingTop: 4, borderTop: "1px solid #1F2937" }}>
+            <span style={{ color: "#64748B" }}>Max Velocity</span>
+            <span style={{ color: "#38BDF8", fontWeight: 600 }}>{pt.max_velocity}/hr</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+type Tab = "signal" | "risk" | "category" | "queue";
+type Resolution = "5min" | "15min" | "1h";
+
+export default function FraudVelocityMonitor() {
+  const [stream, setStream] = useState<SignalPoint[]>([]);
+  const [anomalies, setAnomalies] = useState<AnomalyEvent[]>([]);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [queue, setQueue] = useState<QueueEvent[]>([]);
+  const [heatmap, setHeatmap] = useState<HeatmapRow[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>("signal");
+  const [resolution, setResolution] = useState<Resolution>("5min");
+  const [selectedAnomaly, setSelectedAnomaly] = useState<SignalPoint | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pulse, setPulse] = useState(true);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const t = setInterval(() => setPulse((p) => !p), 800);
+    return () => clearInterval(t);
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const mockStream = genSignalStream(288);
+    const [streamRes, anomRes, metRes, catRes, queueRes, heatRes] = await Promise.all([
+      fetchFallback<{ stream: SignalPoint[] }>(`${API_BASE}/api/signal-stream?resolution=${resolution}&hours_back=24`, { stream: mockStream }),
+      fetchFallback<{ anomalies: AnomalyEvent[] }>(`${API_BASE}/api/anomalies`, {
+        anomalies: mockStream.filter((p) => p.anomaly).map((p) => ({ ...p, spike_type: p.spike_type ?? "burst" })),
+      }),
+      fetchFallback<Metrics>(`${API_BASE}/api/metrics/summary`, {
+        total_events: 12450, fraud_count: 187, flagged_for_review: 94,
+        fraud_rate_pct: 1.5, total_exposure_usd: 4280000, peak_velocity_1h: 37,
+        anomaly_minutes: 58, avg_fraud_velocity_1h: 26.4, pct_above_regional_avg: 34.2,
+      }),
+      // ─── FIX 2: real fallback data — was [] which made tabs empty ────────────
+      fetchFallback<{ categories: CategoryRow[] }>(`${API_BASE}/api/metrics/category-breakdown`, { categories: genCategoryBreakdown() }),
+      fetchFallback<{ queue: QueueEvent[] }>(`${API_BASE}/api/review-queue`, { queue: genReviewQueue() }),
+      fetchFallback<{ heatmap: HeatmapRow[] }>(`${API_BASE}/api/metrics/velocity-heatmap`, { heatmap: genHeatmap(mockStream) }),
+    ]);
+    // FINGERPRINT FIX: API stream has no device_fingerprint/ip_hash.
+    // Inject them from mockStream by matching index position.
+    const rawStream = streamRes.stream ?? mockStream;
+    const enrichedStream = rawStream.map((pt, idx) => ({
+      ...pt,
+      device_fingerprint: pt.device_fingerprint ?? mockStream[idx]?.device_fingerprint ?? `FP-${10000 + idx}`,
+      ip_hash: pt.ip_hash ?? mockStream[idx]?.ip_hash ?? `ip-${100000 + idx}`,
+    }));
+    setStream(enrichedStream);
+    setAnomalies(anomRes.anomalies ?? []);
+    setMetrics(metRes as Metrics);
+    setCategories(catRes.categories ?? genCategoryBreakdown());
+    setQueue(queueRes.queue ?? genReviewQueue());
+    setHeatmap(heatRes.heatmap ?? genHeatmap(mockStream));
+    setLoading(false);
+  }, [resolution]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const fmtTime = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    } catch { return ts; }
+  };
+
+  const chartData = stream.map((p) => ({
+    ...p,
+    time: fmtTime(p.timestamp),
+    // ─── FIX 3: use txn_count + 2 so markers always appear at chart top ───────
+    anomalyMarker: p.anomaly ? p.txn_count + 2 : null,
+  }));
+
+  const spikeColor = (type: string | null) =>
+    type === "burst" ? "#F87171" : type === "risk_surge" ? "#FBBF24" : type === "amount_spike" ? "#818CF8" : "#38BDF8";
+
+  const labelColor = (l: string) =>
+    l === "fraudulent" ? "#F87171" : l === "suspicious" ? "#FBBF24" : "#34D399";
+
+  // ─── FIX 4: only open inspector when the clicked point IS an anomaly ─────────
+  // ─── FIX 5: use setTimeout so panel is in DOM before scrollIntoView ──────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleChartClick = (data: any) => {
+    if (!data?.activePayload?.length) return;
+    const raw = data.activePayload[0].payload as SignalPoint;
+    if (!raw?.anomaly) return;
+    // Find enriched point from stream so FP/IP are never missing
+    const match = stream.find((p) => p.timestamp === raw.timestamp) ?? raw;
+    setSelectedAnomaly(match);
+    setTimeout(() => {
+      panelRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 0);
+  };
+
+  const xTickEvery = resolution === "5min" ? 12 : resolution === "15min" ? 4 : 2;
+
+  return (
+    <div style={{ minHeight: "100vh", height: "100vh", background: "#030712", color: "#E2E8F0", fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+      {/* TOP BAR */}
+      <header style={{ background: "#0B1117", borderBottom: "1px solid #1F2937", padding: "10px 16px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#38BDF8", boxShadow: "0 0 6px #38BDF8" }} />
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#38BDF8", letterSpacing: "0.1em", fontWeight: 600 }}>
+          REAL RAILS // FRAUD VELOCITY MONITOR
+        </span>
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: "#475569", marginLeft: "auto" }}>TEMPORAL · SIGNAL STREAM · CFPB/FRED</span>
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: "#64748B", background: "rgba(129,140,248,0.1)", border: "1px solid rgba(129,140,248,0.25)", padding: "2px 8px", borderRadius: 3 }}>ARCHETYPE: TEMPORAL</span>
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: loading ? "#FBBF24" : "#34D399", opacity: pulse ? 1 : 0.3, transition: "opacity 0.3s" }} />
+      </header>
+
+      {/* MAIN 70/30 GRID */}
+      <div style={{ display: "grid", gridTemplateColumns: "70% 30%", flex: 1, minHeight: 0, overflow: "hidden" }}>
+
+        {/* MAIN STAGE 70% */}
+        <main style={{ display: "flex", flexDirection: "column", borderRight: "1px solid #1F2937", minHeight: 0, overflow: "hidden" }}>
+
+          {/* METRIC STRIP */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", borderBottom: "1px solid #1F2937", flexShrink: 0 }}>
+            {[
+              { label: "TOTAL TXNS / 24H", value: metrics?.total_events?.toLocaleString() ?? "—", color: "#E2E8F0" },
+              { label: "FRAUD DETECTED",   value: metrics?.fraud_count?.toLocaleString() ?? "—",   color: "#F87171" },
+              { label: "FRAUD RATE",       value: metrics ? `${metrics.fraud_rate_pct.toFixed(1)}%` : "—", color: "#FBBF24" },
+              { label: "ANOMALY BURSTS",   value: metrics?.anomaly_minutes?.toLocaleString() ?? "—", color: "#818CF8" },
+              { label: "PEAK VELOCITY",    value: metrics ? `${metrics.peak_velocity_1h}/hr` : "—", color: "#38BDF8" },
+            ].map((m, i) => (
+              <div key={i} style={{ padding: "10px 14px", borderRight: i < 4 ? "1px solid #1F2937" : "none" }}>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 600, color: m.color, lineHeight: 1.1 }}>{m.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* TABS + RESOLUTION */}
+          <div style={{ display: "flex", alignItems: "center", background: "#0B1117", borderBottom: "1px solid #1F2937", flexShrink: 0 }}>
+            {(["signal", "risk", "category", "queue"] as Tab[]).map((tab) => (
+              <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "8px 14px", background: "transparent", border: "none", color: activeTab === tab ? "#38BDF8" : "#475569", borderBottom: `2px solid ${activeTab === tab ? "#38BDF8" : "transparent"}`, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, cursor: "pointer", letterSpacing: "0.08em" }}>
+                {tab === "signal" ? "SIGNAL STREAM" : tab === "risk" ? "RISK SCORE" : tab === "category" ? "BY CATEGORY" : "REVIEW QUEUE"}
+              </button>
+            ))}
+            <div style={{ marginLeft: "auto", display: "flex", gap: 4, paddingRight: 12 }}>
+              {(["5min", "15min", "1h"] as Resolution[]).map((r) => (
+                <button key={r} onClick={() => setResolution(r)} style={{ padding: "3px 8px", background: resolution === r ? "rgba(56,189,248,0.15)" : "transparent", border: `1px solid ${resolution === r ? "rgba(56,189,248,0.4)" : "#1F2937"}`, color: resolution === r ? "#38BDF8" : "#475569", borderRadius: 3, fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, cursor: "pointer", letterSpacing: "0.06em" }}>
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ─── FIX 6: minHeight:0 not "100%" — allows flex child to shrink ─── */}
+          <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 12 }}>
+{/* SIGNAL STREAM TAB */}
+{activeTab === "signal" && (
+  <div>
+    <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 12 }}>
+      <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.08em" }}>
+        TRANSACTION SIGNAL STREAM · CLICK ANOMALY SPIKE ▲ TO INSPECT
+      </span>
+      <span style={{ marginLeft: "auto", display: "flex", gap: 12, fontSize: 10 }}>
+        {[{ c: "#34D399", l: "Normal" }, { c: "#FBBF24", l: "Suspicious" }, { c: "#F87171", l: "Fraud" }, { c: "#818CF8", l: "Anomaly" }].map((x) => (
+          <span key={x.l} style={{ display: "flex", alignItems: "center", gap: 4, color: "#94A3B8" }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: x.c }} />{x.l}
+          </span>
+        ))}
+      </span>
+    </div>
+
+    <div style={{ width: "100%", height: 220 }}>
+      <ResponsiveContainer width="100%" height={220}>
+        <ComposedChart data={chartData} style={{ cursor: "default" }}>
+          <CartesianGrid strokeDasharray="2 4" stroke="#1F2937" vertical={false} />
+          <XAxis dataKey="time" tick={{ fill: "#475569", fontSize: 9, fontFamily: "'IBM Plex Mono', monospace" }} interval={xTickEvery} tickLine={false} axisLine={{ stroke: "#1F2937" }} />
+          <YAxis tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={false} width={28} />
+          <Tooltip content={<SignalTooltip />} />
+          <Area type="monotone" dataKey="normal_count" stackId="1" fill="#34D399" fillOpacity={0.25} stroke="#34D399" strokeWidth={0} name="Normal" />
+          <Area type="monotone" dataKey="suspicious_count" stackId="1" fill="#FBBF24" fillOpacity={0.35} stroke="#FBBF24" strokeWidth={0} name="Suspicious" />
+          <Area type="monotone" dataKey="fraud_count" stackId="1" fill="#F87171" fillOpacity={0.6} stroke="#F87171" strokeWidth={1} name="Fraud" />
+          
+          {/* THE CRITICAL FIX: Direct onClick and cursor on the Scatter points */}
+          <Scatter 
+            dataKey="anomalyMarker" 
+            name="Anomaly"
+            style={{ cursor: 'pointer' }}
+            onClick={(data) => {
+              if (data && data.payload) {
+                setSelectedAnomaly(data.payload);
+                // Smooth scroll to the panel once it appears
+                setTimeout(() => {
+                  panelRef.current?.scrollIntoView({ behavior: "smooth" });
+                }, 100);
+              }
+            }}
+            shape={(props: { cx?: number; cy?: number; payload?: SignalPoint }) => {
+              const { cx, cy, payload } = props;
+              if (!payload?.anomaly || cx === undefined || cy === undefined) return <></>;
+              return (
+                <polygon 
+                  points={`${cx},${cy - 8} ${cx - 5},${cy} ${cx + 5},${cy}`} 
+                  fill={spikeColor(payload.spike_type ?? null)} 
+                  opacity={0.9} 
+                />
+              );
+            }}
+          />
+          
+          {anomalies.slice(0, 5).map((a, i) => (
+            <ReferenceLine key={i} x={fmtTime(a.timestamp)} stroke={spikeColor(a.spike_type)} strokeDasharray="3 3" strokeOpacity={0.4} strokeWidth={1} />
+          ))}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+
+                <div style={{ marginTop: 12, marginBottom: 6 }}>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.08em" }}>MAX TRANSACTION VELOCITY / BUCKET (RULE THRESHOLD: 15/HR)</span>
+                </div>
+                <div style={{ width: "100%", height: 100 }}>
+                  <ResponsiveContainer width="100%" height={100}>
+                    <ComposedChart data={chartData}>
+                      <CartesianGrid strokeDasharray="2 4" stroke="#1F2937" vertical={false} />
+                      <XAxis dataKey="time" tick={{ fill: "#475569", fontSize: 9 }} interval={xTickEvery} tickLine={false} axisLine={{ stroke: "#1F2937" }} />
+                      <YAxis tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={false} width={28} />
+                      <Tooltip content={<SignalTooltip />} />
+                      <Bar dataKey="max_velocity" name="Max Velocity" radius={[1, 1, 0, 0]}>
+                        {chartData.map((entry, i) => (
+                          <Cell key={i} fill={entry.max_velocity >= 15 ? "#F87171" : entry.max_velocity >= 8 ? "#FBBF24" : "#38BDF8"} fillOpacity={0.75} />
+                        ))}
+                      </Bar>
+                      <ReferenceLine y={15} stroke="#F87171" strokeDasharray="4 2" strokeWidth={1} label={{ value: "RULE", fill: "#F87171", fontSize: 9, fontFamily: "'IBM Plex Mono', monospace" }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div style={{ marginTop: 12, marginBottom: 6 }}>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.08em" }}>TRANSACTION VOLUME USD / BUCKET</span>
+                </div>
+                <div style={{ width: "100%", height: 90 }}>
+                  <ResponsiveContainer width="100%" height={90}>
+                    <ComposedChart data={chartData}>
+                      <CartesianGrid strokeDasharray="2 4" stroke="#1F2937" vertical={false} />
+                      <XAxis dataKey="time" tick={{ fill: "#475569", fontSize: 9 }} interval={xTickEvery} tickLine={false} axisLine={{ stroke: "#1F2937" }} />
+                      <YAxis tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={false} width={28} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} />
+                      <Tooltip content={<SignalTooltip />} />
+                      <Area type="monotone" dataKey="total_amount" fill="#818CF8" fillOpacity={0.2} stroke="#818CF8" strokeWidth={1} name="Volume USD" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* ANOMALY INSPECTOR — opens when you click a spike */}
+                {selectedAnomaly && (
+                  <div ref={panelRef} style={{ marginTop: 16, background: "#0F1822", border: `1px solid ${spikeColor(selectedAnomaly.spike_type)}40`, borderLeft: `3px solid ${spikeColor(selectedAnomaly.spike_type)}`, borderRadius: "0 6px 6px 0", padding: "12px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: spikeColor(selectedAnomaly.spike_type), letterSpacing: "0.08em", fontWeight: 600 }}>
+                        ⚡ ANOMALY INSPECTED — {selectedAnomaly.spike_type?.replace("_", " ").toUpperCase()}
+                      </div>
+                      <button onClick={() => setSelectedAnomaly(null)} style={{ background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 11 }}>
+                        ✕ CLOSE
+                      </button>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                      {[
+                        { label: "TIME",          value: fmtTime(selectedAnomaly.timestamp),         color: "#94A3B8" },
+                        { label: "FRAUD TXNS",    value: String(selectedAnomaly.fraud_count),         color: "#F87171" },
+                        { label: "AVG RISK",      value: selectedAnomaly.avg_risk.toFixed(3),         color: "#FBBF24" },
+                        { label: "PEAK VELOCITY", value: `${selectedAnomaly.max_velocity}/hr`,        color: "#38BDF8" },
+                        { label: "DEVICE FP",     value: selectedAnomaly.device_fingerprint ?? "N/A", color: "#818CF8" },
+                        { label: "IP HASH",       value: selectedAnomaly.ip_hash ?? "N/A",            color: "#818CF8" },
+                      ].map((x, i) => (
+                        <div key={i} style={{ background: "#0B1117", borderRadius: 4, padding: "8px 10px", border: "1px solid #1F2937" }}>
+                          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 8, color: "#475569", letterSpacing: "0.08em", marginBottom: 4 }}>{x.label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: x.color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 11, color: "#64748B", lineHeight: 1.6 }}>
+                      {selectedAnomaly.spike_type === "burst" && "Velocity burst detected: multiple fraud transactions fired within a single time bucket, indicative of account-takeover or card-testing attacks."}
+                      {selectedAnomaly.spike_type === "risk_surge" && "Risk score surge: aggregate model confidence in fraudulent intent elevated above 0.55 threshold, possibly linked to device/IP clustering."}
+                      {selectedAnomaly.spike_type === "amount_spike" && "Transaction volume spike: abnormal dollar volume in this bucket may indicate a high-value wire fraud attempt or coordinated cash-out."}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RISK SCORE TAB */}
+            {activeTab === "risk" && (
+              <div>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.08em", marginBottom: 8 }}>AVG RISK SCORE TIMELINE · ANOMALY THRESHOLD 0.55</div>
+                <div style={{ width: "100%", height: 280 }}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <ComposedChart data={chartData}>
+                      <CartesianGrid strokeDasharray="2 4" stroke="#1F2937" vertical={false} />
+                      <XAxis dataKey="time" tick={{ fill: "#475569", fontSize: 9 }} interval={xTickEvery} tickLine={false} axisLine={{ stroke: "#1F2937" }} />
+                      <YAxis domain={[0, 1]} tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={false} width={28} />
+                      <Tooltip content={<SignalTooltip />} />
+                      <Area type="monotone" dataKey="avg_risk" fill="#38BDF8" fillOpacity={0.12} stroke="#38BDF8" strokeWidth={1.5} name="Avg Risk" />
+                      <ReferenceLine y={0.55} stroke="#F87171" strokeDasharray="4 2" label={{ value: "ALERT 0.55", fill: "#F87171", fontSize: 9, fontFamily: "'IBM Plex Mono', monospace" }} />
+                      <Scatter dataKey="anomalyMarker" name="Anomaly">
+                        {chartData.map((entry, i) => (<Cell key={i} fill={spikeColor(entry.spike_type ?? null)} />))}
+                      </Scatter>
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.08em", marginBottom: 8 }}>AVERAGE FRAUD COUNT BY HOUR OF DAY</div>
+                  <div style={{ width: "100%", height: 120 }}>
+                    <ResponsiveContainer width="100%" height={120}>
+                      <BarChart data={heatmap}>
+                        <CartesianGrid strokeDasharray="2 4" stroke="#1F2937" vertical={false} />
+                        <XAxis dataKey="hour" tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={{ stroke: "#1F2937" }} tickFormatter={(h) => `${String(h).padStart(2, "0")}h`} interval={2} />
+                        <YAxis tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={false} width={24} />
+                        <Tooltip contentStyle={{ background: "#0F1822", border: "1px solid #1F2937", fontSize: 11 }} />
+                        <Bar dataKey="avg_fraud" name="Avg Fraud/min" fill="#F87171" fillOpacity={0.7} radius={[2, 2, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* BY CATEGORY TAB */}
+            {activeTab === "category" && (
+              <div>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.08em", marginBottom: 8 }}>FRAUD RATE % BY MERCHANT CATEGORY</div>
+                {/* ─── FIX 8: ResponsiveContainer height was 100 but wrapper was 280 ─── */}
+                <div style={{ width: "100%", height: 280 }}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={[...categories].sort((a, b) => b.fraud_rate - a.fraud_rate)} layout="vertical">
+                      <CartesianGrid strokeDasharray="2 4" stroke="#1F2937" horizontal={false} />
+                      <XAxis type="number" tick={{ fill: "#475569", fontSize: 9 }} tickLine={false} axisLine={{ stroke: "#1F2937" }} tickFormatter={(v) => `${v}%`} />
+                      <YAxis dataKey="merchant_category" type="category" width={110} tick={{ fill: "#94A3B8", fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ background: "#0F1822", border: "1px solid #1F2937", fontSize: 11 }} formatter={(v: any) => [`${(Number(v) || 0).toFixed(1)}%`, "Fraud Rate"]} />
+                      <Bar dataKey="fraud_rate" name="Fraud Rate %" radius={[0, 3, 3, 0]}>
+                        {[...categories].sort((a, b) => b.fraud_rate - a.fraud_rate).map((entry, i) => (
+                          <Cell key={i} fill={entry.fraud_rate > 20 ? "#F87171" : entry.fraud_rate > 10 ? "#FBBF24" : "#38BDF8"} fillOpacity={0.75} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* REVIEW QUEUE TAB */}
+            {activeTab === "queue" && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                  <thead>
+                    <tr style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", borderBottom: "1px solid #1F2937" }}>
+                      {["EVENT ID","LABEL","RISK","AMOUNT","VEL/HR","DEVICE","CATEGORY","DEVICE FP","IP HASH"].map((h) => (
+                        <th key={h} style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #1F2937", letterSpacing: "0.06em" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {queue.map((e) => (
+                      <tr key={e.event_id} style={{ borderBottom: "1px solid rgba(31,41,55,0.5)" }}>
+                        <td style={{ padding: "6px 8px", fontFamily: "'IBM Plex Mono', monospace", color: "#38BDF8" }}>{e.event_id}</td>
+                        <td style={{ padding: "6px 8px" }}>
+                          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, padding: "2px 6px", borderRadius: 3, color: labelColor(e.label), background: `${labelColor(e.label)}22` }}>
+                            {e.label.toUpperCase()}
+                          </span>
+                        </td>
+                        <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600, color: labelColor(e.label) }}>{e.risk_score.toFixed(3)}</td>
+                        <td style={{ padding: "6px 8px", textAlign: "right", color: "#94A3B8" }}>${e.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                        <td style={{ padding: "6px 8px", textAlign: "right", color: e.velocity_1h > 15 ? "#F87171" : "#64748B" }}>{e.velocity_1h}</td>
+                        <td style={{ padding: "6px 8px", fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#64748B" }}>{e.device_type}</td>
+                        <td style={{ padding: "6px 8px", fontSize: 10, color: "#94A3B8" }}>{e.merchant_category}</td>
+                        <td style={{ padding: "6px 8px", fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#818CF8" }}>{e.device_fingerprint ?? "—"}</td>
+                        <td style={{ padding: "6px 8px", fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#818CF8" }}>{e.ip_hash ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </main>
+
+        {/* INTELLIGENCE SIDEBAR 30% */}
+        <aside style={{ background: "#0B1117", display: "flex", flexDirection: "column", overflowY: "auto", minHeight: 0 }}>
+
+          {/* SECTION A */}
+          <section style={{ padding: 16, borderBottom: "1px solid #1F2937", flexShrink: 0 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.1em", marginBottom: 8 }}>SECTION A · PROJECT 7 · PAYMENT RAIL</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#38BDF8", marginBottom: 12 }}>Fraud Velocity Monitor</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[
+                { label: "EXPOSURE USD",  value: metrics ? `$${(metrics.total_exposure_usd / 1000000).toFixed(2)}M` : "—", color: "#818CF8" },
+                { label: "AVG FRAUD VEL", value: metrics ? `${metrics.avg_fraud_velocity_1h}/hr` : "—",                  color: "#F87171" },
+                { label: "ANOMALY MINS",  value: metrics?.anomaly_minutes?.toString() ?? "—",                             color: "#FBBF24" },
+                { label: "% ABOVE AVG",   value: metrics ? `${metrics.pct_above_regional_avg}%` : "—",                   color: "#38BDF8" },
+              ].map((m, i) => (
+                <div key={i} style={{ background: "#030712", borderRadius: 4, padding: "8px 10px", border: "1px solid #1F2937" }}>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 8, color: "#475569", letterSpacing: "0.08em", marginBottom: 4 }}>{m.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: m.color }}>{m.value}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ANOMALY LEGEND */}
+          <section style={{ padding: 16, borderBottom: "1px solid #1F2937", flexShrink: 0 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.1em", marginBottom: 10 }}>ANOMALY SPIKE TYPES</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {[
+                { type: "burst",        color: "#F87171", label: "Velocity Burst", desc: "Multiple fraud txns / bucket — card testing or ATO" },
+                { type: "risk_surge",   color: "#FBBF24", label: "Risk Surge",     desc: "Avg risk > 0.55 — device/IP clustering signal" },
+                { type: "amount_spike", color: "#818CF8", label: "Amount Spike",   desc: "Abnormal $ volume — wire fraud or cash-out" },
+              ].map((s) => (
+                <div key={s.type} style={{ background: "#030712", borderRadius: 4, padding: "8px 10px", border: `1px solid ${s.color}30`, borderLeft: `2px solid ${s.color}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color }} />
+                    <span style={{ fontSize: 11, fontWeight: 500, color: s.color }}>{s.label}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: "#64748B", lineHeight: 1.5 }}>{s.desc}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* SECTION B */}
+          <section style={{ padding: 16, borderBottom: "1px solid #1F2937", flexShrink: 0 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.1em", marginBottom: 8 }}>SECTION B · WHY THIS MATTERS</div>
+            <p style={{ fontSize: 11, color: "#94A3B8", lineHeight: 1.7 }}>
+              Velocity rules are the first line of defense inside payment rails. When accounts fire more transactions per minute than their behavioral baseline allows, the system flags a potential account-takeover or card-not-present fraud cascade.
+            </p>
+            <div style={{ marginTop: 10, background: "rgba(56,189,248,0.05)", borderLeft: "2px solid #38BDF8", padding: "8px 10px", borderRadius: "0 4px 4px 0" }}>
+              <div style={{ fontSize: 10, color: "#38BDF8", fontWeight: 500, marginBottom: 4 }}>Real Rails Context</div>
+              <p style={{ fontSize: 10, color: "#64748B", lineHeight: 1.6 }}>CFPB complaint data + FRED economic indicators provide macro signal for anomaly baselines.</p>
+            </div>
+            <div style={{ marginTop: 10, background: "rgba(129,140,248,0.05)", borderLeft: "2px solid #818CF8", padding: "8px 10px", borderRadius: "0 4px 4px 0" }}>
+              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#818CF8", letterSpacing: "0.06em", marginBottom: 4 }}>FRED · DRCCLACBS — DELINQUENCY RATE</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: "#818CF8" }}>2.61%</div>
+              <div style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>Q4 2024 · Federal Reserve FRED (mock)</div>
+            </div>
+          </section>
+
+          {/* SECTION C */}
+          <section style={{ padding: 16, borderBottom: "1px solid #1F2937", flexShrink: 0 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.1em", marginBottom: 8 }}>SECTION C · WHO CONTROLS THE RAIL</div>
+            <p style={{ fontSize: 11, color: "#94A3B8", lineHeight: 1.6, marginBottom: 10 }}>Financial systems analyzing transaction speed and frequency — real-time detection of fraudulent behavior patterns.</p>
+            {[
+              { label: "Card Networks", tag: "Visa · MC · Amex",    color: "#818CF8" },
+              { label: "Regulators",    tag: "CFPB · FinCEN",       color: "#38BDF8" },
+              { label: "Fraud Engines", tag: "NICE · Featurespace", color: "#34D399" },
+            ].map((r) => (
+              <div key={r.label} style={{ background: "#030712", borderRadius: 4, padding: "7px 10px", border: "1px solid #1F2937", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: "#94A3B8" }}>{r.label}</span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, padding: "2px 6px", borderRadius: 3, color: r.color, background: `${r.color}15` }}>{r.tag}</span>
+              </div>
+            ))}
+          </section>
+
+          {/* SECTION D */}
+          <section style={{ padding: 16, borderBottom: "1px solid #1F2937", flexShrink: 0 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.1em", marginBottom: 10 }}>SECTION D · RESOLUTION & VIEW</div>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", marginBottom: 6, letterSpacing: "0.08em" }}>TIME RESOLUTION</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {(["5min", "15min", "1h"] as Resolution[]).map((r) => (
+                  <button key={r} onClick={() => setResolution(r)} style={{ flex: 1, padding: "6px 0", background: resolution === r ? "rgba(56,189,248,0.15)" : "transparent", border: `1px solid ${resolution === r ? "rgba(56,189,248,0.4)" : "#1F2937"}`, color: resolution === r ? "#38BDF8" : "#475569", borderRadius: 4, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, cursor: "pointer" }}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button onClick={loadData} style={{ width: "100%", background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.3)", color: "#38BDF8", borderRadius: 4, padding: "8px 0", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, cursor: "pointer", letterSpacing: "0.08em" }}>
+              ↺ REFRESH STREAM
+            </button>
+          </section>
+
+          {/* SECTION E */}
+          <section style={{ padding: 16, flexShrink: 0 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: "#475569", letterSpacing: "0.1em", marginBottom: 10 }}>SECTION E · EXPORT</div>
+            <a href={`${API_BASE}/api/download/sample-data`} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.3)", color: "#38BDF8", borderRadius: 4, padding: "8px 0", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, textDecoration: "none", letterSpacing: "0.08em" }}>
+              ↓ DOWNLOAD SIGNAL STREAM (CSV)
+            </a>
+            <p style={{ marginTop: 8, fontSize: 10, color: "#475569", lineHeight: 1.6 }}>100-row signal stream sample · anomaly labels · velocity buckets · CFPB/FRED schema</p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="frontend/eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="frontend/next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "axios": "^1.14.0",
+    "leaflet": "^1.9.4",
+    "next": "16.2.2",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-leaflet": "^5.0.0",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.2",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+</file>
+
+<file path="frontend/postcss.config.mjs">
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+</file>
+
+<file path="frontend/public/file.svg">
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+</file>
+
+<file path="frontend/public/globe.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+</file>
+
+<file path="frontend/public/next.svg">
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
+</file>
+
+<file path="frontend/public/vercel.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+</file>
+
+<file path="frontend/public/window.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+</file>
+
+<file path="frontend/README.md">
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+</file>
+
+<file path="frontend/tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+</file>
+
+</files>
